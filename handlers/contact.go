@@ -1,12 +1,8 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
-	"text/template"
 
 	"contact.app_backend/contact"
 	"contact.app_backend/db"
@@ -21,9 +17,9 @@ type Contact struct {
 
 func (c Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	email := r.URL.Query().Get("e")
 	switch r.Method {
 	case http.MethodGet:
-		email := r.URL.Query().Get("e")
 		if email == "" {
 			c.getAll(w)
 		} else {
@@ -31,8 +27,33 @@ func (c Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case http.MethodPost:
 		c.addOne(w, r)
+	case http.MethodDelete:
+		c.deleteOne(w, email)
 	default:
+		http.Error(w, "ki korchish bhai... keno korchish erom", http.StatusMethodNotAllowed)
 	}
+}
+
+func (c Contact) deleteOne(w http.ResponseWriter, email string) {
+
+	cont, err := db.ToDoc(db.FindOne(c.l, email))
+
+	if err != nil || len(cont.Docs) < 1 {
+		c.l.Println(err)
+		http.Error(w, "Error in deleting document", http.StatusInternalServerError)
+		return
+	}
+
+	c.l.Println(cont)
+
+	_, err = c.db.Delete(cont.Docs[0].Id, cont.Docs[0].Rev)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (c Contact) addOne(w http.ResponseWriter, r *http.Request) {
@@ -75,38 +96,16 @@ func (c Contact) getAll(w http.ResponseWriter) {
 }
 
 func (c Contact) findOne(w http.ResponseWriter, email string) {
-	query, err := template.ParseFiles("./handlers/searchQuery.txt")
 
-	if err != nil {
-		http.Error(w, "Error in reading query file", http.StatusInternalServerError)
-		return
-	}
-
-	qbuf := bytes.Buffer{}
-
-	query.Execute(&qbuf, map[string]string{
-		"email": email,
-	})
-
-	resp, err := http.Post("http://admin:Tr0069er@localhost:5984/sdb_test/_find", "application/json", &qbuf)
-
-	if err != nil {
-		http.Error(w, "Error in fetchingn query from db", http.StatusInternalServerError)
-		return
-	}
-
-	rbuf, _ := io.ReadAll(resp.Body)
-
-	dbresp := db.FindResp{}
-
-	err = json.Unmarshal(rbuf, &dbresp)
+	cont, err := db.ToContact(db.FindOne(c.l, email))
 
 	if err != nil {
 		c.l.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	dbresp.Docs.TOJSON(w)
+	cont.Docs.TOJSON(w)
 }
 
 func NewContact(l *log.Logger, db *couchdb.DB) *Contact {

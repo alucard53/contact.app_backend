@@ -28,7 +28,7 @@ func initServer(l *log.Logger, db *couchdb.DB) Server {
 	return Server{
 		srv: &http.Server{
 			Addr:    ":6969",
-			Handler: cors.Default().Handler(mx),
+			Handler: cors.AllowAll().Handler(mx),
 		},
 		l: l,
 	}
