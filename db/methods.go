@@ -2,7 +2,6 @@ package db
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -10,7 +9,27 @@ import (
 	"text/template"
 )
 
-func FindOne(l *log.Logger, email string) []byte {
+func Search(l *log.Logger, q string) io.Reader {
+
+	query, _ := template.ParseFiles("./handlers/findQuery.txt")
+	qbuf := bytes.Buffer{}
+	query.Execute(&qbuf, map[string]string{
+		"q": q,
+	})
+
+	l.Println(qbuf.String())
+
+	resp, err := http.Post("http://admin:Tr0069er@localhost:5984/sdb_test/_find", "application/json", &qbuf)
+
+	if err != nil {
+		l.Println("Error in querying db", err)
+		return nil
+	}
+
+	return resp.Body
+}
+
+func FindOne(l *log.Logger, email string) io.Reader {
 
 	query, _ := template.ParseFiles("./handlers/searchQuery.txt")
 
@@ -23,51 +42,44 @@ func FindOne(l *log.Logger, email string) []byte {
 	resp, err := http.Post("http://admin:Tr0069er@localhost:5984/sdb_test/_find", "application/json", &qbuf)
 
 	if err != nil {
-		l.Println("Error in querying db")
+		l.Println("Error in querying db", err)
 		return nil
 	}
 
-	rbuf, err := io.ReadAll(resp.Body)
-
-	l.Printf("%s", rbuf)
-
-	if err != nil {
-		l.Println("Error reading response body")
-		return nil
-	}
-
-	return rbuf
+	return resp.Body
 }
 
-func ToDoc(buf []byte) (*DelResp, error) {
+func ToDoc(body io.Reader) (*DelResp, error) {
 
-	if buf == nil {
-		return nil, errors.New("Nil buffer")
+	if body == nil {
+		return nil, errors.New("Nil bodyfer")
 	}
 
 	dbresp := DelResp{}
 
-	err := json.Unmarshal(buf, &dbresp)
+	err := dbresp.FromJSON(body)
 
 	if err != nil {
 		return nil, err
 	}
+
 	return &dbresp, nil
 
 }
 
-func ToContact(buf []byte) (*FindResp, error) {
+func ToContact(body io.Reader) (*FindResp, error) {
 
-	if buf == nil {
-		return nil, errors.New("Nil buffer")
+	if body == nil {
+		return nil, errors.New("Nil bodyfer")
 	}
 
 	dbresp := FindResp{}
 
-	err := json.Unmarshal(buf, &dbresp)
+	err := dbresp.FromJSON(body)
 
 	if err != nil {
 		return nil, err
 	}
+
 	return &dbresp, nil
 }

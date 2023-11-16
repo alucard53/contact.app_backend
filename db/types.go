@@ -1,6 +1,11 @@
 package db
 
-import "contact.app_backend/contact"
+import (
+	"encoding/json"
+	"io"
+
+	"contact.app_backend/contact"
+)
 
 type DBDoc struct {
 	Id  string `json:"_id"`
@@ -19,4 +24,22 @@ type FindResp struct {
 
 type DelResp struct {
 	Docs []DBDoc `json:"docs"`
+}
+
+func (dbr *FindResp) FromJSON(r io.Reader) error {
+	err := json.NewDecoder(r).Decode(dbr)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dbr *DelResp) FromJSON(r io.Reader) error {
+	err := json.NewDecoder(r).Decode(dbr)
+	if err != nil {
+		return err
+	}
+	return nil
 }

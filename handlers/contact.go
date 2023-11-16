@@ -24,7 +24,7 @@ func (c Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if email == "" {
 			c.getAll(w)
 		} else {
-			c.findOne(w, email)
+			c.search(w, email)
 		}
 	case http.MethodPost:
 		c.addOne(w, r.Body)
@@ -116,21 +116,18 @@ func (c Contact) getAll(w http.ResponseWriter) {
 		}
 	}
 
-	contacts.TOJSON(w)
-
+	contacts.ToJSON(w)
 }
 
-func (c Contact) findOne(w http.ResponseWriter, email string) {
+func (c Contact) search(w http.ResponseWriter, email string) {
+	dbResp := db.FindResp{}
+	data := db.Search(c.l, email)
 
-	cont, err := db.ToContact(db.FindOne(c.l, email))
+	dbResp.FromJSON(data)
 
-	if err != nil {
-		c.l.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	c.l.Println(dbResp.Docs)
 
-	cont.Docs.TOJSON(w)
+	dbResp.Docs.ToJSON(w)
 }
 
 func NewContact(l *log.Logger, db *couchdb.DB) *Contact {
